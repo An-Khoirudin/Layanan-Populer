@@ -62,7 +62,7 @@
                 <i class="fa-solid fa-filter text-[#8C6D58]"></i>
                 <span>Filter Data</span>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-stone-500 mb-1">Tahun</label>
                     <select id="filter-tahun" class="w-full bg-[#fcfaf8] border border-[#e8ded3] text-stone-800 text-sm rounded-lg p-2.5 focus:ring-[#8C6D58] focus:border-[#8C6D58]">
@@ -79,6 +79,12 @@
                     <label class="block text-xs font-medium text-stone-500 mb-1">Akses Layanan</label>
                     <select id="filter-akses" class="w-full bg-[#fcfaf8] border border-[#e8ded3] text-stone-800 text-sm rounded-lg p-2.5 focus:ring-[#8C6D58] focus:border-[#8C6D58]">
                         <option value="">Semua Akses Layanan</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-stone-500 mb-1">Asal Instansi</label>
+                    <select id="filter-instansi" class="w-full bg-[#fcfaf8] border border-[#e8ded3] text-stone-800 text-sm rounded-lg p-2.5 focus:ring-[#8C6D58] focus:border-[#8C6D58]">
+                        <option value="">Semua Asal Instansi</option>
                     </select>
                 </div>
             </div>
@@ -170,12 +176,17 @@
         const monthsName = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
         const labelMapping = {
-            'Konsultasi Grand Design Pembangunan Kependudukan/GDPK/Peta Jalan': 'PJPK/GDPK',
-            'Konsultasi Data/Parameter Program Bangga Kencana': 'Parameter',
-            'Konsultasi Rumah Data Kependudukan/Rumah DataKu': 'Rumah DataKu',
-            'Pemanfaatan Tools Proyeksi Target Indikator Kependudukan dan Pembangunan Keluarga': 'Tools proyeksi',
-            'Pemanfaatan Living Database 30 Indikator PJPK': 'Living Database'
+            'konsultasi grand design pembangunan kependudukan/gdpk/peta jalan': 'PJPK/GDPK',
+            'konsultasi data/parameter program bangga kencana': 'Parameter',
+            'konsultasi rumah data kependudukan/rumah dataku': 'Rumah DataKu',
+            'pemanfaatan tools proyeksi target indikator kependudukan dan pembangunan keluarga': 'Tools proyeksi',
+            'pemanfaatan living database 30 indikator pjpk': 'Living Database'
         };
+
+        function cleanText(text) {
+            if (!text) return '';
+            return text.toString().trim().replace(/\s+/g, ' ');
+        }
 
         google.charts.load('current', { 'packages': ['geochart'] });
 
@@ -185,6 +196,7 @@
             document.getElementById('filter-tahun').addEventListener('change', applyFilters);
             document.getElementById('filter-layanan').addEventListener('change', applyFilters);
             document.getElementById('filter-akses').addEventListener('change', applyFilters);
+            document.getElementById('filter-instansi').addEventListener('change', applyFilters);
         });
 
         function fetchCSVData() {
@@ -195,7 +207,7 @@
                 complete: function(results) {
                     rawData = results.data.filter(row => {
                         const ketKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'ket');
-                        const ketVal = ketKey ? row[ketKey].trim().toLowerCase() : '';
+                        const ketVal = ketKey ? cleanText(row[ketKey]).toLowerCase() : '';
                         return ketVal === 'ya';
                     });
                     
@@ -216,59 +228,83 @@
         function getBulanFromTimestamp(timestampStr) {
             if (!timestampStr) return null;
             
+            const datePart = cleanText(timestampStr).split(' ')[0];
+            const parts = datePart.split(/[\/\-]/);
+            
+            if (parts.length >= 3) {
+                let monthNum = parseInt(parts[0], 10);
+                if (monthNum >= 1 && monthNum <= 12) {
+                    return monthsName[monthNum - 1];
+                }
+            }
+
             const dateObj = new Date(timestampStr);
             if (!isNaN(dateObj.getTime())) {
                 return monthsName[dateObj.getMonth()];
             }
 
-            const parts = timestampStr.split(' ')[0].split(/[\/\-]/);
-            if (parts.length >= 3) {
-                let monthNum = parseInt(parts[1], 10);
-                if (monthNum >= 1 && monthNum <= 12) {
-                    return monthsName[monthNum - 1];
-                }
-            }
             return null;
         }
 
         function getTahunFromTimestamp(timestampStr) {
             if (!timestampStr) return null;
+            
+            const datePart = cleanText(timestampStr).split(' ')[0];
+            const parts = datePart.split(/[\/\-]/);
+            
+            if (parts.length >= 3) {
+                let yr = parts[2].trim();
+                if (yr.length === 4) return yr;
+            }
+
             const dateObj = new Date(timestampStr);
             if (!isNaN(dateObj.getTime())) {
                 return dateObj.getFullYear().toString();
             }
-            const parts = timestampStr.split(' ')[0].split(/[\/\-]/);
-            if (parts.length >= 3) {
-                let yr = parts[2];
-                if (yr.length === 4) return yr;
-            }
+            
             return null;
         }
 
         function populateFilterOptions() {
             const tahunSet = new Set();
-            const layananSet = new Set();
-            const aksesSet = new Set();
+            const layananMap = new Map();
+            const aksesMap = new Map();
+            const instansiMap = new Map();
 
             rawData.forEach(row => {
                 const tsKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'timestamp');
                 const lynKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'jenis layanan');
                 const aksKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'akses layanan');
+                const insKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'asal instansi');
 
                 let tahunVal = tsKey ? getTahunFromTimestamp(row[tsKey]) : null;
                 if (!tahunVal) {
                     const thnKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'tahun');
-                    if (thnKey && row[thnKey]) tahunVal = row[thnKey].trim();
+                    if (thnKey && row[thnKey]) tahunVal = cleanText(row[thnKey]);
                 }
 
                 if (tahunVal) tahunSet.add(tahunVal);
-                if (lynKey && row[lynKey]) layananSet.add(row[lynKey].trim());
-                if (aksKey && row[aksKey]) aksesSet.add(row[aksKey].trim());
+                
+                if (lynKey && row[lynKey]) {
+                    const lynVal = cleanText(row[lynKey]);
+                    if (lynVal) layananMap.set(lynVal.toLowerCase(), lynVal);
+                }
+
+                if (aksKey && row[aksKey]) {
+                    const aksVal = cleanText(row[aksKey]);
+                    if (aksVal) aksesMap.set(aksVal.toLowerCase(), aksVal);
+                }
+
+                if (insKey && row[insKey]) {
+                    const insVal = cleanText(row[insKey]);
+                    if (insVal) instansiMap.set(insVal.toLowerCase(), insVal);
+                }
             });
 
             fillSelect('filter-tahun', Array.from(tahunSet).sort());
-            fillSelect('filter-layanan', Array.from(layananSet).sort());
-            fillSelect('filter-akses', Array.from(aksesSet).sort());
+            fillSelect('filter-layanan', Array.from(layananMap.values()).sort());
+            fillSelect('filter-akses', Array.from(aksesMap.values()).sort());
+            fillSelect('filter-instansi', Array.from(instansiMap.values()).sort());
         }
 
         function fillSelect(elementId, values) {
@@ -276,36 +312,40 @@
             select.innerHTML = '<option value="">Semua</option>';
             values.forEach(val => {
                 const opt = document.createElement('option');
-                opt.value = val;
+                opt.value = val.toLowerCase();
                 opt.innerText = val;
                 select.appendChild(opt);
             });
         }
 
         function applyFilters() {
-            const selectedTahun = document.getElementById('filter-tahun').value;
-            const selectedLayanan = document.getElementById('filter-layanan').value;
-            const selectedAkses = document.getElementById('filter-akses').value;
+            const selectedTahun = document.getElementById('filter-tahun').value.toLowerCase();
+            const selectedLayanan = document.getElementById('filter-layanan').value.toLowerCase();
+            const selectedAkses = document.getElementById('filter-akses').value.toLowerCase();
+            const selectedInstansi = document.getElementById('filter-instansi').value.toLowerCase();
 
             filteredData = rawData.filter(row => {
                 const tsKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'timestamp');
                 const lynKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'jenis layanan');
                 const aksKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'akses layanan');
+                const insKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'asal instansi');
 
                 let valTahun = tsKey ? getTahunFromTimestamp(row[tsKey]) : null;
                 if (!valTahun) {
                     const thnKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'tahun');
-                    if (thnKey && row[thnKey]) valTahun = row[thnKey].trim();
+                    if (thnKey && row[thnKey]) valTahun = cleanText(row[thnKey]);
                 }
 
-                const valLyn = lynKey ? row[lynKey].trim() : '';
-                const valAks = aksKey ? row[aksKey].trim() : '';
+                const valLyn = lynKey && row[lynKey] ? cleanText(row[lynKey]).toLowerCase() : '';
+                const valAks = aksKey && row[aksKey] ? cleanText(row[aksKey]).toLowerCase() : '';
+                const valIns = insKey && row[insKey] ? cleanText(row[insKey]).toLowerCase() : '';
 
-                const matchTahun = !selectedTahun || valTahun === selectedTahun;
+                const matchTahun = !selectedTahun || (valTahun && valTahun.toLowerCase() === selectedTahun);
                 const matchLayanan = !selectedLayanan || valLyn === selectedLayanan;
                 const matchAkses = !selectedAkses || valAks === selectedAkses;
+                const matchInstansi = !selectedInstansi || valIns === selectedInstansi;
 
-                return matchTahun && matchLayanan && matchAkses;
+                return matchTahun && matchLayanan && matchAkses && matchInstansi;
             });
 
             updateDashboard();
@@ -320,7 +360,7 @@
 
         function getIdFromRow(row) {
             const idKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'id');
-            return idKey ? row[idKey].trim() : null;
+            return idKey && row[idKey] ? cleanText(row[idKey]) : null;
         }
 
         function renderSection1() {
@@ -339,7 +379,7 @@
                 
                 if (!bulan) {
                     const bulanKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'bulan');
-                    if (bulanKey && row[bulanKey]) bulan = row[bulanKey].trim();
+                    if (bulanKey && row[bulanKey]) bulan = cleanText(row[bulanKey]);
                 }
 
                 if (!bulan) bulan = 'Lainnya';
@@ -393,10 +433,11 @@
             const jenisCounts = {};
             filteredData.forEach(row => {
                 const key = Object.keys(row).find(k => k.trim().toLowerCase() === 'jenis layanan');
-                let jenis = key && row[key] ? row[key].trim() : 'Lainnya';
-                
-                if (labelMapping[jenis]) {
-                    jenis = labelMapping[jenis];
+                let jenis = key && row[key] ? cleanText(row[key]) : 'Lainnya';
+                let jenisLower = jenis.toLowerCase();
+
+                if (labelMapping[jenisLower]) {
+                    jenis = labelMapping[jenisLower];
                 }
 
                 const id = getIdFromRow(row);
@@ -408,31 +449,59 @@
 
             // 2. Asal Instansi
             const instansiCounts = {};
+            const instansiDisplayName = {};
+
             filteredData.forEach(row => {
                 const key = Object.keys(row).find(k => k.trim().toLowerCase() === 'asal instansi');
-                const instansi = key && row[key] ? row[key].trim() : 'Lainnya';
+                const instansi = key && row[key] ? cleanText(row[key]) : 'Lainnya';
+                const instansiKey = instansi.toLowerCase();
+
+                if (!instansiDisplayName[instansiKey]) {
+                    instansiDisplayName[instansiKey] = instansi;
+                }
+
                 const id = getIdFromRow(row);
                 if (id) {
-                    if (!instansiCounts[instansi]) instansiCounts[instansi] = new Set();
-                    instansiCounts[instansi].add(id);
+                    if (!instansiCounts[instansiKey]) instansiCounts[instansiKey] = new Set();
+                    instansiCounts[instansiKey].add(id);
                 }
+            });
+
+            const formattedInstansiCounts = {};
+            Object.keys(instansiCounts).forEach(key => {
+                const name = instansiDisplayName[key] || key;
+                formattedInstansiCounts[name] = instansiCounts[key];
             });
 
             // 3. Akses Layanan
             const aksesCounts = {};
+            const aksesDisplayName = {};
+
             filteredData.forEach(row => {
                 const key = Object.keys(row).find(k => k.trim().toLowerCase() === 'akses layanan');
-                const akses = key && row[key] ? row[key].trim() : 'Lainnya';
+                const akses = key && row[key] ? cleanText(row[key]) : 'Lainnya';
+                const aksesKey = akses.toLowerCase();
+
+                if (!aksesDisplayName[aksesKey]) {
+                    aksesDisplayName[aksesKey] = akses;
+                }
+
                 const id = getIdFromRow(row);
                 if (id) {
-                    if (!aksesCounts[akses]) aksesCounts[akses] = new Set();
-                    aksesCounts[akses].add(id);
+                    if (!aksesCounts[aksesKey]) aksesCounts[aksesKey] = new Set();
+                    aksesCounts[aksesKey].add(id);
                 }
             });
 
+            const formattedAksesCounts = {};
+            Object.keys(aksesCounts).forEach(key => {
+                const name = aksesDisplayName[key] || key;
+                formattedAksesCounts[name] = aksesCounts[key];
+            });
+
             renderBarChart('jenisLayananChart', jenisCounts, 'Jenis Layanan', '#8C6D58');
-            renderBarChart('instansiChart', instansiCounts, 'Asal Instansi', '#A68A74');
-            renderBarChart('aksesChart', aksesCounts, 'Akses Layanan', '#6E503B');
+            renderBarChart('instansiChart', formattedInstansiCounts, 'Asal Instansi', '#A68A74');
+            renderBarChart('aksesChart', formattedAksesCounts, 'Akses Layanan', '#6E503B');
         }
 
         function renderBarChart(canvasId, datasetMap, labelName, color) {
@@ -468,7 +537,8 @@
 
         function renderSection4() {
             const provCounts = {};
-            
+            const provDisplayName = {};
+
             const geoProvMapping = {
                 'daerah istimewa yogyakarta': 'Special Region of Yogyakarta',
                 'diy': 'Special Region of Yogyakarta',
@@ -483,7 +553,7 @@
                     return cleanKey === 'prov clean' || cleanKey === 'provclean' || cleanKey === 'provinsi';
                 });
 
-                let prov = key && row[key] ? row[key].trim() : '';
+                let prov = key && row[key] ? cleanText(row[key]) : '';
 
                 if (prov) {
                     const lowerProv = prov.toLowerCase();
@@ -492,11 +562,16 @@
                     }
                 }
 
+                const provKey = prov.toLowerCase();
+                if (provKey && !provDisplayName[provKey]) {
+                    provDisplayName[provKey] = prov;
+                }
+
                 const id = getIdFromRow(row);
                 
-                if (prov && id) {
-                    if (!provCounts[prov]) provCounts[prov] = new Set();
-                    provCounts[prov].add(id);
+                if (provKey && id) {
+                    if (!provCounts[provKey]) provCounts[provKey] = new Set();
+                    provCounts[provKey].add(id);
                 }
             });
 
@@ -504,8 +579,8 @@
                 const geoContainer = document.getElementById('geoChart');
 
                 const chartData = [['Provinsi', 'Pengguna Unik']];
-                Object.keys(provCounts).forEach(p => {
-                    chartData.push([p, provCounts[p].size]);
+                Object.keys(provCounts).forEach(pKey => {
+                    chartData.push([provDisplayName[pKey], provCounts[pKey].size]);
                 });
 
                 if (chartData.length === 1) {
