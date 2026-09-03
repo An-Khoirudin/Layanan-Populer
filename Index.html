@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring Layanan Populer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Plugin DataLabels -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <!-- Google Charts untuk GeoChart -->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <!-- PapaParse untuk membaca CSV Google Sheets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #fcfaf8;
+        }
+        .card {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px -2px rgba(87, 65, 52, 0.04);
+            border: 1px solid #f0eae1;
+        }
+    </style>
+</head>
+<body class="text-stone-800 antialiased min-h-screen flex flex-col">
+
+    <!-- HEADER -->
+    <header class="bg-white border-b border-stone-200/80 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-gradient-to-br from-[#8C6D58] to-[#6E503B] text-white font-bold p-3 rounded-xl shadow-sm flex items-center justify-center">
+                    <i class="fa-solid fa-users-line text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-stone-900 tracking-tight">Monitoring Layanan Populer</h1>
+                    <p class="text-xs font-semibold text-[#8C6D58] uppercase tracking-wider">Direktorat Perencanaan Pengendalian Penduduk</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 bg-[#f7f3ee] text-[#6E503B] px-3.5 py-1.5 rounded-full border border-[#e8ded3] text-xs font-medium">
+                <span class="w-2 h-2 rounded-full bg-[#8C6D58] animate-pulse"></span>
+                <span id="data-status">Mengunduh Data...</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-6">
+
+        <!-- FILTER SECTION -->
+        <section class="card p-5">
+            <div class="flex items-center gap-2 mb-4 text-stone-800 font-semibold">
+                <i class="fa-solid fa-filter text-[#8C6D58]"></i>
+                <span>Filter Data</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-stone-500 mb-1">Tahun</label>
+                    <select id="filter-tahun" class="w-full bg-[#fcfaf8] border border-[#e8ded3] text-stone-800 text-sm rounded-lg p-2.5 focus:ring-[#8C6D58] focus:border-[#8C6D58]">
+                        <option value="">Semua Tahun</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-stone-500 mb-1">Jenis Layanan</label>
+                    <select id="filter-layanan" class="w-full bg-[#fcfaf8] border border-[#e8ded3] text-stone-800 text-sm rounded-lg p-2.5 focus:ring-[#8C6D58] focus:border-[#8C6D58]">
+                        <option value="">Semua Jenis Layanan</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-stone-500 mb-1">Akses Layanan</label>
+                    <select id="filter-akses" class="w-full bg-[#fcfaf8] border border-[#e8ded3] text-stone-800 text-sm rounded-lg p-2.5 focus:ring-[#8C6D58] focus:border-[#8C6D58]">
+                        <option value="">Semua Akses Layanan</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 1: METRICS -->
+        <section class="w-full">
+            <div class="card p-6 border-l-4 border-l-[#8C6D58] flex items-center justify-between w-full">
+                <div>
+                    <p class="text-xs font-semibold text-stone-400 uppercase tracking-wider">Total Pengguna Layanan</p>
+                    <h2 id="metric-total-pengguna" class="text-4xl font-extrabold text-stone-900 mt-2">0</h2>
+                </div>
+                <div class="bg-[#f7f3ee] text-[#8C6D58] p-4 rounded-2xl">
+                    <i class="fa-solid fa-id-card text-2xl"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: TREND LINE CHART -->
+        <section class="card p-6">
+            <h3 class="text-lg font-bold text-stone-800 mb-1">Tren Pengguna Layanan Populer</h3>
+            <p class="text-xs text-stone-500 mb-4">Menurut Bulan</p>
+            <div class="relative h-72">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </section>
+
+        <!-- SECTION 3: BAR CHARTS -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Barchart Jenis Layanan -->
+            <div class="card p-6 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-stone-800 mb-1">Jenis Layanan</h3>
+                    <p class="text-xs text-stone-500 mb-4">Jumlah Pengguna layanan</p>
+                </div>
+                <div class="relative h-64">
+                    <canvas id="jenisLayananChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Barchart Asal Instansi -->
+            <div class="card p-6 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-stone-800 mb-1">Asal Instansi</h3>
+                    <p class="text-xs text-stone-500 mb-4">Jumlah Pengguna layanan</p>
+                </div>
+                <div class="relative h-64">
+                    <canvas id="instansiChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Barchart Akses Layanan -->
+            <div class="card p-6 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-stone-800 mb-1">Akses Layanan</h3>
+                    <p class="text-xs text-stone-500 mb-4">Jumlah Pengguna layanan</p>
+                </div>
+                <div class="relative h-64">
+                    <canvas id="aksesChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: GEO CHART -->
+        <section class="card p-6">
+            <h3 class="text-lg font-bold text-stone-800 mb-1">Sebaran Pengguna berdasarkan Provinsi</h3>
+            <p class="text-xs text-stone-500 mb-4">Visualisasi Geografis jumlah Pengguna Layanan di seluruh Indonesia</p>
+            <div id="geoChart" class="w-full h-96 flex items-center justify-center text-stone-400">
+                Memuat Peta...
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-white border-t border-stone-200/80 py-4 text-center text-xs text-stone-500 mt-auto">
+        &copy; Direktorat Perencanaan Pengendalian Penduduk — Dashboard Monitoring
+    </footer>
+
+    <!-- LOGIC JAVASCRIPT -->
+    <script>
+        Chart.register(ChartDataLabels);
+
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_yBEg6KdsD21lExQ9c3n01sm_0m6LpnoIPasvTDYRgQgWBa2d3Hy_SyOt79yGqv3N0Rn_fLRCJO2Y/pub?gid=1682413902&single=true&output=csv';
+
+        let rawData = [];
+        let filteredData = [];
+        let chartInstances = {};
+
+        const monthsName = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+        const labelMapping = {
+            'Konsultasi Grand Design Pembangunan Kependudukan/GDPK/Peta Jalan': 'PJPK/GDPK',
+            'Konsultasi Data/Parameter Program Bangga Kencana': 'Parameter',
+            'Konsultasi Rumah Data Kependudukan/Rumah DataKu': 'Rumah DataKu',
+            'Pemanfaatan Tools Proyeksi Target Indikator Kependudukan dan Pembangunan Keluarga': 'Tools proyeksi',
+            'Pemanfaatan Living Database 30 Indikator PJPK': 'Living Database'
+        };
+
+        google.charts.load('current', { 'packages': ['geochart'] });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchCSVData();
+
+            document.getElementById('filter-tahun').addEventListener('change', applyFilters);
+            document.getElementById('filter-layanan').addEventListener('change', applyFilters);
+            document.getElementById('filter-akses').addEventListener('change', applyFilters);
+        });
+
+        function fetchCSVData() {
+            Papa.parse(CSV_URL, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    rawData = results.data.filter(row => {
+                        const ketKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'ket');
+                        const ketVal = ketKey ? row[ketKey].trim().toLowerCase() : '';
+                        return ketVal === 'ya';
+                    });
+                    
+                    filteredData = [...rawData];
+
+                    document.getElementById('data-status').innerText = 'Data Terhubung';
+                    
+                    populateFilterOptions();
+                    updateDashboard();
+                },
+                error: function(err) {
+                    console.error("Gagal mengambil data:", err);
+                    document.getElementById('data-status').innerText = 'Gagal Memuat Data';
+                }
+            });
+        }
+
+        function getBulanFromTimestamp(timestampStr) {
+            if (!timestampStr) return null;
+            
+            const dateObj = new Date(timestampStr);
+            if (!isNaN(dateObj.getTime())) {
+                return monthsName[dateObj.getMonth()];
+            }
+
+            const parts = timestampStr.split(' ')[0].split(/[\/\-]/);
+            if (parts.length >= 3) {
+                let monthNum = parseInt(parts[1], 10);
+                if (monthNum >= 1 && monthNum <= 12) {
+                    return monthsName[monthNum - 1];
+                }
+            }
+            return null;
+        }
+
+        function getTahunFromTimestamp(timestampStr) {
+            if (!timestampStr) return null;
+            const dateObj = new Date(timestampStr);
+            if (!isNaN(dateObj.getTime())) {
+                return dateObj.getFullYear().toString();
+            }
+            const parts = timestampStr.split(' ')[0].split(/[\/\-]/);
+            if (parts.length >= 3) {
+                let yr = parts[2];
+                if (yr.length === 4) return yr;
+            }
+            return null;
+        }
+
+        function populateFilterOptions() {
+            const tahunSet = new Set();
+            const layananSet = new Set();
+            const aksesSet = new Set();
+
+            rawData.forEach(row => {
+                const tsKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'timestamp');
+                const lynKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'jenis layanan');
+                const aksKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'akses layanan');
+
+                let tahunVal = tsKey ? getTahunFromTimestamp(row[tsKey]) : null;
+                if (!tahunVal) {
+                    const thnKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'tahun');
+                    if (thnKey && row[thnKey]) tahunVal = row[thnKey].trim();
+                }
+
+                if (tahunVal) tahunSet.add(tahunVal);
+                if (lynKey && row[lynKey]) layananSet.add(row[lynKey].trim());
+                if (aksKey && row[aksKey]) aksesSet.add(row[aksKey].trim());
+            });
+
+            fillSelect('filter-tahun', Array.from(tahunSet).sort());
+            fillSelect('filter-layanan', Array.from(layananSet).sort());
+            fillSelect('filter-akses', Array.from(aksesSet).sort());
+        }
+
+        function fillSelect(elementId, values) {
+            const select = document.getElementById(elementId);
+            select.innerHTML = '<option value="">Semua</option>';
+            values.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.innerText = val;
+                select.appendChild(opt);
+            });
+        }
+
+        function applyFilters() {
+            const selectedTahun = document.getElementById('filter-tahun').value;
+            const selectedLayanan = document.getElementById('filter-layanan').value;
+            const selectedAkses = document.getElementById('filter-akses').value;
+
+            filteredData = rawData.filter(row => {
+                const tsKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'timestamp');
+                const lynKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'jenis layanan');
+                const aksKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'akses layanan');
+
+                let valTahun = tsKey ? getTahunFromTimestamp(row[tsKey]) : null;
+                if (!valTahun) {
+                    const thnKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'tahun');
+                    if (thnKey && row[thnKey]) valTahun = row[thnKey].trim();
+                }
+
+                const valLyn = lynKey ? row[lynKey].trim() : '';
+                const valAks = aksKey ? row[aksKey].trim() : '';
+
+                const matchTahun = !selectedTahun || valTahun === selectedTahun;
+                const matchLayanan = !selectedLayanan || valLyn === selectedLayanan;
+                const matchAkses = !selectedAkses || valAks === selectedAkses;
+
+                return matchTahun && matchLayanan && matchAkses;
+            });
+
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            renderSection1();
+            renderSection2();
+            renderSection3();
+            renderSection4();
+        }
+
+        function getIdFromRow(row) {
+            const idKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'id');
+            return idKey ? row[idKey].trim() : null;
+        }
+
+        function renderSection1() {
+            const uniqueIDs = new Set(filteredData.map(r => getIdFromRow(r)).filter(Boolean));
+            document.getElementById('metric-total-pengguna').innerText = uniqueIDs.size.toLocaleString('id-ID');
+        }
+
+        function renderSection2() {
+            const monthlyCounts = {};
+
+            filteredData.forEach(row => {
+                const tsKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'timestamp');
+                const tsVal = tsKey ? row[tsKey] : null;
+
+                let bulan = getBulanFromTimestamp(tsVal);
+                
+                if (!bulan) {
+                    const bulanKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'bulan');
+                    if (bulanKey && row[bulanKey]) bulan = row[bulanKey].trim();
+                }
+
+                if (!bulan) bulan = 'Lainnya';
+
+                const id = getIdFromRow(row);
+                if (id) {
+                    if (!monthlyCounts[bulan]) monthlyCounts[bulan] = new Set();
+                    monthlyCounts[bulan].add(id);
+                }
+            });
+
+            let labels = Object.keys(monthlyCounts).sort((a, b) => {
+                let indexA = monthsName.indexOf(a);
+                let indexB = monthsName.indexOf(b);
+                if (indexA === -1) indexA = 99;
+                if (indexB === -1) indexB = 99;
+                return indexA - indexB;
+            });
+
+            const data = labels.map(l => monthlyCounts[l].size);
+
+            renderChart('trendChart', 'line', {
+                labels: labels,
+                datasets: [{
+                    label: 'Pengguna Unik',
+                    data: data,
+                    borderColor: '#8C6D58',
+                    backgroundColor: 'rgba(140, 109, 88, 0.12)',
+                    fill: true,
+                    tension: 0.35,
+                    pointBackgroundColor: '#6E503B',
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            }, {
+                plugins: {
+                    datalabels: {
+                        display: true,
+                        align: 'top',
+                        anchor: 'end',
+                        font: { weight: 'bold', size: 11 },
+                        color: '#6E503B',
+                        formatter: (value) => value.toLocaleString('id-ID')
+                    }
+                }
+            });
+        }
+
+        function renderSection3() {
+            // 1. Jenis Layanan
+            const jenisCounts = {};
+            filteredData.forEach(row => {
+                const key = Object.keys(row).find(k => k.trim().toLowerCase() === 'jenis layanan');
+                let jenis = key && row[key] ? row[key].trim() : 'Lainnya';
+                
+                if (labelMapping[jenis]) {
+                    jenis = labelMapping[jenis];
+                }
+
+                const id = getIdFromRow(row);
+                if (id) {
+                    if (!jenisCounts[jenis]) jenisCounts[jenis] = new Set();
+                    jenisCounts[jenis].add(id);
+                }
+            });
+
+            // 2. Asal Instansi
+            const instansiCounts = {};
+            filteredData.forEach(row => {
+                const key = Object.keys(row).find(k => k.trim().toLowerCase() === 'asal instansi');
+                const instansi = key && row[key] ? row[key].trim() : 'Lainnya';
+                const id = getIdFromRow(row);
+                if (id) {
+                    if (!instansiCounts[instansi]) instansiCounts[instansi] = new Set();
+                    instansiCounts[instansi].add(id);
+                }
+            });
+
+            // 3. Akses Layanan
+            const aksesCounts = {};
+            filteredData.forEach(row => {
+                const key = Object.keys(row).find(k => k.trim().toLowerCase() === 'akses layanan');
+                const akses = key && row[key] ? row[key].trim() : 'Lainnya';
+                const id = getIdFromRow(row);
+                if (id) {
+                    if (!aksesCounts[akses]) aksesCounts[akses] = new Set();
+                    aksesCounts[akses].add(id);
+                }
+            });
+
+            renderBarChart('jenisLayananChart', jenisCounts, 'Jenis Layanan', '#8C6D58');
+            renderBarChart('instansiChart', instansiCounts, 'Asal Instansi', '#A68A74');
+            renderBarChart('aksesChart', aksesCounts, 'Akses Layanan', '#6E503B');
+        }
+
+        function renderBarChart(canvasId, datasetMap, labelName, color) {
+            const sortedEntries = Object.entries(datasetMap)
+                .map(([label, setObj]) => [label, setObj.size])
+                .sort((a, b) => b[1] - a[1]);
+
+            const labels = sortedEntries.map(entry => entry[0]);
+            const data = sortedEntries.map(entry => entry[1]);
+
+            renderChart(canvasId, 'bar', {
+                labels: labels,
+                datasets: [{
+                    label: labelName,
+                    data: data,
+                    backgroundColor: color,
+                    borderRadius: 6
+                }]
+            }, { 
+                indexAxis: 'y',
+                plugins: {
+                    datalabels: {
+                        display: true,
+                        align: 'end',
+                        anchor: 'end',
+                        font: { weight: 'bold', size: 10 },
+                        color: '#6E503B',
+                        formatter: (value) => value.toLocaleString('id-ID')
+                    }
+                } 
+            });
+        }
+
+        function renderSection4() {
+            const provCounts = {};
+            
+            const geoProvMapping = {
+                'daerah istimewa yogyakarta': 'Special Region of Yogyakarta',
+                'diy': 'Special Region of Yogyakarta',
+                'yogyakarta': 'Special Region of Yogyakarta',
+                'dki jakarta': 'Jakarta',
+                'daerah khusus ibukota jakarta': 'Jakarta'
+            };
+
+            filteredData.forEach(row => {
+                const key = Object.keys(row).find(k => {
+                    const cleanKey = k.trim().toLowerCase();
+                    return cleanKey === 'prov clean' || cleanKey === 'provclean' || cleanKey === 'provinsi';
+                });
+
+                let prov = key && row[key] ? row[key].trim() : '';
+
+                if (prov) {
+                    const lowerProv = prov.toLowerCase();
+                    if (geoProvMapping[lowerProv]) {
+                        prov = geoProvMapping[lowerProv];
+                    }
+                }
+
+                const id = getIdFromRow(row);
+                
+                if (prov && id) {
+                    if (!provCounts[prov]) provCounts[prov] = new Set();
+                    provCounts[prov].add(id);
+                }
+            });
+
+            google.charts.setOnLoadCallback(() => {
+                const geoContainer = document.getElementById('geoChart');
+
+                const chartData = [['Provinsi', 'Pengguna Unik']];
+                Object.keys(provCounts).forEach(p => {
+                    chartData.push([p, provCounts[p].size]);
+                });
+
+                if (chartData.length === 1) {
+                    geoContainer.innerHTML = '<span class="text-stone-400">Data provinsi tidak tersedia.</span>';
+                    return;
+                }
+
+                geoContainer.innerHTML = '';
+
+                const dataTable = google.visualization.arrayToDataTable(chartData);
+                const options = {
+                    region: 'ID',
+                    resolution: 'provinces',
+                    colorAxis: { colors: ['#f0eae1', '#6E503B'] },
+                    backgroundColor: 'transparent',
+                    datalessRegionColor: '#f7f5f2'
+                };
+
+                const chart = new google.visualization.GeoChart(geoContainer);
+                chart.draw(dataTable, options);
+            });
+        }
+
+        function renderChart(canvasId, type, chartData, extraOptions = {}) {
+            if (chartInstances[canvasId]) {
+                chartInstances[canvasId].destroy();
+            }
+
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            chartInstances[canvasId] = new Chart(ctx, {
+                type: type,
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    ...extraOptions
+                }
+            });
+        }
+    </script>
+</body>
+</html>
